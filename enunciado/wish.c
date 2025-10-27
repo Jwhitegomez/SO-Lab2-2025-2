@@ -48,17 +48,14 @@ int builtin_exit(char **args) {
 }
 
 int builtin_path(char **args) {
-    // Limpia el path actual
     for (int i = 0; i < MAX_PATH; i++)
         shell_path[i] = NULL;
 
-    // Si hay argumentos, agrégalos
     int i = 1;
     while (args[i] != NULL && i < MAX_PATH) {
         shell_path[i - 1] = args[i];
         i++;
     }
-
     return 1;
 }
 
