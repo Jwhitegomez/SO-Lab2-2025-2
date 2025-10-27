@@ -2,18 +2,18 @@
 #import <stdlib.h>
 
 int cd(char **args);
-int help(char **args);
+int path(char **args);
 int exit(char **args);
 
 char *builtin_str[] = {
   "cd",
-  "help",
+  "path",
   "exit"
 };
 
 int (*builtin_func[]) (char **) = {
   &cd,
-  &help,
+  &path,
   &exit
 };
 
@@ -24,27 +24,17 @@ int num_builtins() {
 int cd(char **args)
 {
   if (args[1] == NULL) {
-    fprintf(stderr, "lsh: expected argument to \"cd\"\n");
+    fprintf(stderr, "wish: expected argument to \"cd\"\n");
   } else {
     if (chdir(args[1]) != 0) {
-      perror("lsh");
+      perror("wish");
     }
   }
   return 1;
 }
 
-int help(char **args)
+int path(char **args)
 {
-  int i;
-  printf("Davidson Pérez and Jimmy Gómez's pepinowao\n");
-  printf("Type program names and arguments, and hit enter.\n");
-  printf("The following are built in:\n");
-
-  for (i = 0; i < num_builtins(); i++) {
-    printf("  %s\n", builtin_str[i]);
-  }
-
-  printf("Use the man command for information on other programs.\n");
   return 1;
 }
 
@@ -58,9 +48,36 @@ int TOKEN_BUFFER_SIZE = 64;
 char *TOKEN_DELIMITERS = " \t\r\n\a";
 
 int main(int argc, char *argv[]) {
+  if (argc == 1) {
+    //Interactive mode
     pepinowao_loop();
-
     return EXIT_SUCCESS;
+  }
+
+  if (argc == 2) {
+    //Batch mode
+    FILE *file = fopen(argv[1], "r");
+    if (!file) {
+      perror("wish");
+      exit(EXIT_FAILURE);
+    }
+
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    while ((read = getline(&line, &len, file)) != -1) {
+      char **args = split_lines(line);
+      execute_command(args);
+      free(args);
+    }
+
+    free(line);
+    fclose(file);
+    exit(EXIT_SUCCESS);
+  }
+
+  return EXIT_SUCCESS;
 }
 
 void pepinowao_loop(void) {
@@ -69,7 +86,7 @@ void pepinowao_loop(void) {
     int status;
 
     do {
-        printf("pepinowao> ");
+        printf("wish> ");
         line = read_lines();
         args = split_lines(line);
         status = execute_command(args);
@@ -101,7 +118,7 @@ char **split_lines(char *line) {
     char *token;
 
     if (!tokens) {
-        fprintf(stderr, "pepinowao: allocation error\n");
+        fprintf(stderr, "wish: allocation error\n");
         exit(EXIT_FAILURE);
     }
 
@@ -113,7 +130,7 @@ char **split_lines(char *line) {
             bufsize += TOKEN_BUFFER_SIZE;
             tokens = realloc(tokens, bufsize * sizeof(char*));
             if (!tokens) {
-                fprintf(stderr, "pepinowao: allocation error\n");
+                fprintf(stderr, "wish: allocation error\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -131,11 +148,11 @@ int launch(char **args) {
     pid = fork();
     if (pid == 0) {
         if (execvp(args[0], args) == -1) {
-            perror("pepinowao");
+            perror("wish");
         }
         exit(EXIT_FAILURE);
     } else if (pid < 0) {
-        perror("pepinowao");
+        perror("wish");
     } else {
         do {
             wpid = waitpid(pid, &status, WUNTRACED);
