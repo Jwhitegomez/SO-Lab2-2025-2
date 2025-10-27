@@ -42,8 +42,7 @@ int builtin_cd(char **args) {
 
 int builtin_path(char **args) {
     for (int i = 0; i < MAX_PATHS; i++) {
-        if (shell_path[i] != NULL)
-            free(shell_path[i]);
+        if (shell_path[i] != NULL) free(shell_path[i]);
         shell_path[i] = NULL;
     }
     int idx = 1;
@@ -55,7 +54,11 @@ int builtin_path(char **args) {
     return 0;
 }
 
-/** Manejar redirección */
+/** Manejar redirección
+ *  Nota: Esta función modifica el arreglo args (pone NULL en el '>'
+ *  y en el nombre del fichero). Devuelve 0 en OK, -1 en error.
+ *  Debe llamarse en el hijo (antes del exec) para no redirigir al padre.
+ */
 int setup_redirection(char **args) {
     int redirect_count = 0, idx = -1;
     for (int i = 0; args[i] != NULL; i++) {
@@ -78,39 +81,47 @@ int setup_redirection(char **args) {
         return -1;
     }
     close(fd);
+
+    /* eliminar tokens '>' y nombre del fichero del array de args */
     args[idx] = NULL;
+    args[idx+1] = NULL;
     return 0;
 }
 
-/** Ejecutar comando externo */
+/** Ejecutar comando externo
+ *  IMPORTANTE: no llamamos a setup_redirection en el padre. Se hace
+ *  en el hijo antes del exec para no afectar al shell.
+ */
 pid_t execute_external(char **args) {
-
-    // ✅ Si PATH está vacío → ignorar sin error
     if (shell_path[0] == NULL) {
-        return -1;
-    }
-
-    int red = setup_redirection(args);
-    if (red == -1) {
+        /* Si path vacío => ignorar sin error (especificación del enunciado) */
         print_error();
         return -1;
     }
 
     pid_t pid = fork();
     if (pid == 0) {
+        /* hijo: manejar redirección aquí */
+        if (setup_redirection(args) == -1) {
+            print_error();
+            _exit(1);
+        }
+
+        /* buscar ejecutable en los directorios del path */
         for (int i = 0; shell_path[i] != NULL; i++) {
             char full[512];
             snprintf(full, sizeof(full), "%s/%s", shell_path[i], args[0]);
             if (access(full, X_OK) == 0) {
                 execv(full, args);
-                exit(1);
+                /* si execv falla, salimos con error (execv solo retorna en error) */
+                print_error();
+                _exit(1);
             }
         }
 
-        // ✅ Aquí sí es válido el error: PATH configurado pero comando no encontrado
+        /* si no se encontró el ejecutable */
         print_error();
-        exit(1);
-
+        _exit(1);
     } else if (pid < 0) {
         print_error();
         return -1;
@@ -129,6 +140,11 @@ void execute_line(char *line) {
 
     char *cmd = strtok(line, "&");
     while (cmd != NULL && num_cmds < MAX_ARGS - 1) {
+        /* trim leading/trailing spaces */
+        while (*cmd == ' ' || *cmd == '\t') cmd++;
+        char *end = cmd + strlen(cmd) - 1;
+        while (end > cmd && (*end == ' ' || *end == '\t' || *end == '\n')) { *end = '\0'; end--; }
+
         commands[num_cmds++] = cmd;
         cmd = strtok(NULL, "&");
     }
@@ -153,6 +169,8 @@ void execute_line(char *line) {
             if (args[1] != NULL) {
                 print_error();
             } else {
+                /* liberar memoria de path antes de salir */
+                for (int k = 0; shell_path[k] != NULL; k++) free(shell_path[k]);
                 exit(0);
             }
             pids[i] = -1;
@@ -206,6 +224,9 @@ int main(int argc, char *argv[]) {
         }
 
         if (getline(&line, &len, input) == -1) {
+            /* EOF: salir limpio */
+            for (int k = 0; shell_path[k] != NULL; k++) free(shell_path[k]);
+            free(line);
             exit(0);
         }
 
