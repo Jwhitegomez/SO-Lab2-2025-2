@@ -25,8 +25,11 @@ void execute_line(char *line);
 //Función principal
 int main(int argc, char *argv[]) {
     FILE *input = stdin;
-    shell_path[0] = strdup("/bin"); //Ruta por defecto de los ejecutables
-    shell_path[1] = NULL;
+    //Rutas por defecto
+    shell_path[0] = strdup("./");
+    shell_path[1] = strdup("/usr/bin/");
+    shell_path[2] = strdup("/bin/");
+    shell_path[3] = NULL;
 
     if (argc > 2) {
         print_error();
@@ -49,11 +52,13 @@ int main(int argc, char *argv[]) {
     while (1) { //Bucle infinito para el shell
         if (!batch_mode) { //Modo interactivo
             printf("wish> ");
-            fflush(stdout);
         }
 
-        if (getline(&line, &len, input) == -1) { //Si se llega al final del archivo o hay un error se sale del shell
-            for (int i = 0; shell_path[i] != NULL; i++) free(shell_path[i]);
+        if (getline(&line, &len, input) == -1) { //Si se llega al final del archivo en modo batch o hay un error se sale del shell
+            for (int i = 0; shell_path[i] != NULL; i++) {
+                free(shell_path[i]);
+            }
+
             free(line);
             exit(0);
         }
@@ -84,7 +89,10 @@ int cd(char **args) {
 int path(char **args) {
     //Se limpia el path anterior
     for (int i = 0; i < MAX_PATHS; i++) {
-        if (shell_path[i] != NULL) free(shell_path[i]);
+        if (shell_path[i] != NULL) {
+            free(shell_path[i]);
+        }
+
         shell_path[i] = NULL;
     }
 
@@ -121,7 +129,8 @@ int redirection(char **args) {
         return -1;
     }
 
-    int fd = open(args[idx+1], O_CREAT | O_WRONLY | O_TRUNC, 0666);
+    //0666 (numero octal para permisos) = primer 6 (usuario), segundo 6 (grupo), tercer 6 (otros)
+    int fd = open(args[idx+1], O_CREAT | O_WRONLY | O_TRUNC, 0666); 
 
     //Si no se puede abrir el archivo, error
     if (fd < 0) {
@@ -233,7 +242,9 @@ void execute_line(char *line) {
             if (args[1] != NULL) {
                 print_error();
             } else {
-                for (int k = 0; shell_path[k] != NULL; k++) free(shell_path[k]);
+                for (int k = 0; shell_path[k] != NULL; k++) {
+                    free(shell_path[k]);
+                }
                 exit(0);
             }
 
