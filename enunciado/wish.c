@@ -42,7 +42,8 @@ int builtin_cd(char **args) {
 
 int builtin_path(char **args) {
     for (int i = 0; i < MAX_PATHS; i++) {
-        free(shell_path[i]);
+        if (shell_path[i] != NULL)
+            free(shell_path[i]);
         shell_path[i] = NULL;
     }
     int idx = 1;
@@ -83,8 +84,9 @@ int setup_redirection(char **args) {
 
 /** Ejecutar comando externo */
 pid_t execute_external(char **args) {
+
+    // ✅ Si PATH está vacío → ignorar sin error
     if (shell_path[0] == NULL) {
-        print_error();
         return -1;
     }
 
@@ -101,15 +103,19 @@ pid_t execute_external(char **args) {
             snprintf(full, sizeof(full), "%s/%s", shell_path[i], args[0]);
             if (access(full, X_OK) == 0) {
                 execv(full, args);
-                break;
+                exit(1);
             }
         }
+
+        // ✅ Aquí sí es válido el error: PATH configurado pero comando no encontrado
         print_error();
         exit(1);
+
     } else if (pid < 0) {
         print_error();
         return -1;
     }
+
     return pid;
 }
 
