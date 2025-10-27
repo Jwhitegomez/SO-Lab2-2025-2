@@ -153,7 +153,8 @@ void execute_line(char *line) {
         } else {
             if (shell_path[0] == NULL) {
                 print_error();
-                return;
+                pids[i] = -1; // no hay proceso para esperar
+                continue;    // NO ejecutar ni forzar execv
             }
             pids[i] = run_external(args, outfile);
         }
